@@ -10,12 +10,17 @@
     },
     "dependencies": {
         "@netlify/blobs": "^8.2.0",
+        "@tabler/icons-react": "^3.33.0",
         "blobshape": "^1.0.0",
         "bright": "^0.8.5",
+        "clsx": "^2.1.1",
+        "framer-motion": "^11.18.2",
         "markdown-to-jsx": "^7.4.5",
+        "motion": "^12.12.1",
         "next": "15.3.2",
         "react": "18.3.1",
         "react-dom": "18.3.1",
+        "tailwind-merge": "^2.6.0",
         "unique-names-generator": "^4.7.1"
     },
     "devDependencies": {
