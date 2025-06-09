@@ -29,7 +29,6 @@ jobs:
       
       - name: Install Claude Code
         run: |
-          # Install Claude Code globally
           npm install -g @anthropic-ai/claude-code
           # Verify installation
           claude --version
@@ -51,34 +50,18 @@ jobs:
       
       - name: Generate documentation with Claude Code
         run: |
-          # Create a context file with existing docs and issue info
-          cat > context.txt << 'EOF'
-          # Documentation Update Request
+          # Create issue context to pipe to Claude
+          cat > issue_context.txt << 'EOF'
+          Documentation Request from Issue #${{ env.ISSUE_NUMBER }}
           
-          **Issue Title:** ${{ env.ISSUE_TITLE }}
-          **Issue Number:** #${{ env.ISSUE_NUMBER }}
-          **Issue URL:** ${{ env.ISSUE_URL }}
+          Title: ${{ env.ISSUE_TITLE }}
           
-          **Issue Description:**
+          Description:
           ${{ env.ISSUE_BODY }}
-          
-          ## Current Documentation Structure
-          Here are the existing files in the /docs directory:
-          
-          $(find docs -name "*.md" -type f 2>/dev/null | head -20 || echo "No existing documentation files found")
-          
-          ## Existing Documentation Content:
-          $(for file in $(find docs -name "*.md" -type f 2>/dev/null | head -5); do
-            echo "### File: $file"
-            echo '```markdown'
-            cat "$file" 2>/dev/null || echo "Could not read file"
-            echo '```'
-            echo ""
-          done)
           EOF
           
-          # Use Claude to analyze and generate documentation updates
-          DOCUMENTATION_UPDATES=$(cat context.txt | claude -p 'Based on this documentation request, analyze what documentation needs to be created or updated. Output a JSON object with the following structure:
+          # Use Claude to generate documentation updates
+          cat issue_context.txt | claude -p 'Based on this GitHub issue requesting documentation updates, analyze the codebase and existing documentation in the /docs folder, then output a JSON object with documentation updates needed. The JSON should have this structure:
           {
             "files_to_update": [
               {
@@ -90,19 +73,16 @@ jobs:
             "summary": "brief summary of changes made"
           }
           
-          Rules:
-          1. If updating existing documentation, include the complete updated content
-          2. If creating new documentation, use appropriate filenames
-          3. Include proper markdown formatting with headings, examples, and clear explanations
-          4. Add a reference to issue #${{ env.ISSUE_NUMBER }} at the bottom of each file
-          5. Follow standard documentation structure (title, overview, details, examples, etc.)
-          6. Output valid JSON only, no other text' --output-format text)
-          
-          # Save the JSON response
-          echo "$DOCUMENTATION_UPDATES" > updates.json
+          Important:
+          - Analyze the existing codebase to understand what needs to be documented
+          - Check existing files in /docs to avoid duplication
+          - Include code examples from the actual codebase when relevant
+          - Add "References issue #${{ env.ISSUE_NUMBER }}" at the bottom of each file
+          - Use proper markdown formatting
+          - Output valid JSON only' --output-format text > updates.json
           
           # Process the updates using jq
-          if command -v jq >/dev/null 2>&1; then
+          if [ -s updates.json ] && jq -e . updates.json >/dev/null 2>&1; then
             # Extract and apply each file update
             jq -r '.files_to_update[] | @base64' updates.json | while read -r file_data; do
               FILENAME=$(echo "$file_data" | base64 -d | jq -r '.filename')
@@ -120,8 +100,9 @@ jobs:
             # Save summary for later use
             jq -r '.summary' updates.json > summary.txt
           else
-            echo "Error: jq is required for JSON processing"
-            exit 1
+            echo "No valid JSON response from Claude or error in parsing"
+            echo "Response content:"
+            cat updates.json
           fi
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -165,31 +146,6 @@ jobs:
           Co-authored-by: Claude <claude@anthropic.com>"
           
           git push
-      
-      - name: Create pull request (alternative approach)
-        if: steps.git_status.outputs.has_changes == 'true' && github.event_name == 'issues'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Alternative: Create a PR instead of direct push
-          # Uncomment this section if you prefer PR workflow
-          
-          # BRANCH_NAME="docs/issue-${{ env.ISSUE_NUMBER }}-$(date +%s)"
-          # git checkout -b "$BRANCH_NAME"
-          # git push origin "$BRANCH_NAME"
-          # 
-          # gh pr create \
-          #   --title "docs: Update documentation for issue #${{ env.ISSUE_NUMBER }}" \
-          #   --body "This PR addresses the documentation request in issue #${{ env.ISSUE_NUMBER }}.
-          # 
-          # **Issue:** ${{ env.ISSUE_TITLE }}
-          # **Changes:** Updated/created documentation based on the issue requirements.
-          # 
-          # Closes #${{ env.ISSUE_NUMBER }}" \
-          #   --head "$BRANCH_NAME" \
-          #   --base main
-          
-          echo "Direct push completed. Uncomment PR section if you prefer pull request workflow."
       
       - name: Comment on issue
         if: steps.git_status.outputs.has_changes == 'true'
@@ -239,8 +195,6 @@ jobs:
           # Add a label to track processed documentation issues
           gh issue edit ${{ env.ISSUE_NUMBER }} --add-label "documentation-processed"
       
-      - name: Install jq if not present
+      - name: Install jq
         run: |
-          if ! command -v jq >/dev/null 2>&1; then
-            sudo apt-get update && sudo apt-get install -y jq
-          fi
+          sudo apt-get update && sudo apt-get install -y jq
