@@ -89,7 +89,7 @@ jobs:
           EOF
           
           # Run Claude Code to generate/update documentation
-          claude-code --prompt-file claude_prompt.md --include-files "docs/**/*.md" --output-dir docs
+          claude --prompt-file claude_prompt.md --include-files "docs/**/*.md" --output-dir docs
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       
