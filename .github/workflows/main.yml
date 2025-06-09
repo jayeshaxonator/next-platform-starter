@@ -29,11 +29,10 @@ jobs:
       
       - name: Install Claude Code
         run: |
-          npm install -g @anthropic-ai/claude-code
+          # Install Claude Code globally
+          npm install -g claude
           # Verify installation
           claude --version
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       
       - name: Create docs directory if it doesn't exist
         run: |
@@ -52,8 +51,8 @@ jobs:
       
       - name: Generate documentation with Claude Code
         run: |
-          # Create a prompt file for Claude Code
-          cat > claude_prompt.md << 'EOF'
+          # Create a context file with existing docs and issue info
+          cat > context.txt << 'EOF'
           # Documentation Update Request
           
           **Issue Title:** ${{ env.ISSUE_TITLE }}
@@ -63,33 +62,67 @@ jobs:
           **Issue Description:**
           ${{ env.ISSUE_BODY }}
           
-          ## Task
-          Please analyze this documentation request and:
-          
-          1. Determine if this relates to existing documentation in the /docs folder
-          2. If existing documentation exists, update it appropriately
-          3. If no relevant documentation exists, create a new markdown file with an appropriate filename
-          4. Ensure the documentation follows standard markdown formatting
-          5. Include proper headings, examples, and clear explanations
-          6. Reference the GitHub issue that prompted this documentation update
-          
           ## Current Documentation Structure
           Here are the existing files in the /docs directory:
           
-          ```
           $(find docs -name "*.md" -type f 2>/dev/null | head -20 || echo "No existing documentation files found")
-          ```
           
-          ## Instructions
-          - Create or update documentation files in the /docs directory
-          - Use clear, concise language
-          - Include code examples where relevant
-          - Add a reference to issue #${{ env.ISSUE_NUMBER }} at the bottom
-          - Follow conventional documentation structure (title, overview, details, examples, etc.)
+          ## Existing Documentation Content:
+          $(for file in $(find docs -name "*.md" -type f 2>/dev/null | head -5); do
+            echo "### File: $file"
+            echo '```markdown'
+            cat "$file" 2>/dev/null || echo "Could not read file"
+            echo '```'
+            echo ""
+          done)
           EOF
           
-          # Run Claude Code to generate/update documentation
-          claude --prompt-file claude_prompt.md --include-files "docs/**/*.md" --output-dir docs
+          # Use Claude to analyze and generate documentation updates
+          DOCUMENTATION_UPDATES=$(cat context.txt | claude -p 'Based on this documentation request, analyze what documentation needs to be created or updated. Output a JSON object with the following structure:
+          {
+            "files_to_update": [
+              {
+                "filename": "docs/filename.md",
+                "action": "create" or "update",
+                "content": "full markdown content of the file"
+              }
+            ],
+            "summary": "brief summary of changes made"
+          }
+          
+          Rules:
+          1. If updating existing documentation, include the complete updated content
+          2. If creating new documentation, use appropriate filenames
+          3. Include proper markdown formatting with headings, examples, and clear explanations
+          4. Add a reference to issue #${{ env.ISSUE_NUMBER }} at the bottom of each file
+          5. Follow standard documentation structure (title, overview, details, examples, etc.)
+          6. Output valid JSON only, no other text' --output-format text)
+          
+          # Save the JSON response
+          echo "$DOCUMENTATION_UPDATES" > updates.json
+          
+          # Process the updates using jq
+          if command -v jq >/dev/null 2>&1; then
+            # Extract and apply each file update
+            jq -r '.files_to_update[] | @base64' updates.json | while read -r file_data; do
+              FILENAME=$(echo "$file_data" | base64 -d | jq -r '.filename')
+              ACTION=$(echo "$file_data" | base64 -d | jq -r '.action')
+              CONTENT=$(echo "$file_data" | base64 -d | jq -r '.content')
+              
+              # Create directory if needed
+              mkdir -p "$(dirname "$FILENAME")"
+              
+              # Write the content to the file
+              echo "$CONTENT" > "$FILENAME"
+              echo "Processed: $FILENAME ($ACTION)"
+            done
+            
+            # Save summary for later use
+            jq -r '.summary' updates.json > summary.txt
+          else
+            echo "Error: jq is required for JSON processing"
+            exit 1
+          fi
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       
@@ -115,13 +148,21 @@ jobs:
           # Get list of changed files for commit message
           CHANGED_FILES=$(git diff --staged --name-only docs/ | tr '\n' ' ')
           
+          # Get summary if available
+          SUMMARY=""
+          if [ -f summary.txt ]; then
+            SUMMARY=$(cat summary.txt)
+          fi
+          
           git commit -m "docs: Update documentation for issue #${{ env.ISSUE_NUMBER }}
 
+          $SUMMARY
+          
           - Updated/created documentation files: $CHANGED_FILES
           - Addresses issue: ${{ env.ISSUE_TITLE }}
           - Issue URL: ${{ env.ISSUE_URL }}
           
-          Co-authored-by: Claude Code <claude@anthropic.com>"
+          Co-authored-by: Claude <claude@anthropic.com>"
           
           git push
       
@@ -155,11 +196,20 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Get summary if available
+          SUMMARY_TEXT=""
+          if [ -f summary.txt ]; then
+            SUMMARY_TEXT="**Summary of changes:**
+          $(cat summary.txt)
+          
+          "
+          fi
+          
           gh issue comment ${{ env.ISSUE_NUMBER }} --body "✅ Documentation has been updated automatically!
 
           The documentation in the \`/docs\` folder has been updated based on your request. 
 
-          **Changes made:**
+          $SUMMARY_TEXT**Files changed:**
           $(git log -1 --name-only --pretty=format:"" docs/ | grep -E '\.md$' | sed 's/^/- /')
 
           You can view the changes in the latest commit: ${{ github.sha }}
@@ -173,7 +223,7 @@ jobs:
         run: |
           gh issue comment ${{ env.ISSUE_NUMBER }} --body "ℹ️ No documentation changes were generated.
 
-          Claude Code analyzed your request but determined that no changes to the existing documentation were needed, or the request may need clarification.
+          Claude analyzed your request but determined that no changes to the existing documentation were needed, or the request may need clarification.
 
           Please review your request and ensure it contains:
           - Clear description of what documentation is needed
@@ -188,3 +238,9 @@ jobs:
         run: |
           # Add a label to track processed documentation issues
           gh issue edit ${{ env.ISSUE_NUMBER }} --add-label "documentation-processed"
+      
+      - name: Install jq if not present
+        run: |
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
