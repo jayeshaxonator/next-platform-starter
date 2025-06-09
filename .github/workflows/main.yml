@@ -49,6 +49,8 @@ jobs:
           echo "ISSUE_URL=${{ github.event.issue.html_url }}" >> $GITHUB_ENV
       
       - name: Generate documentation with Claude Code
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           # Create issue context to pipe to Claude
           cat > issue_context.txt << 'EOF'
@@ -69,8 +71,7 @@ jobs:
           - Add "References issue #${{ env.ISSUE_NUMBER }}" at the bottom of each file
           - Use proper markdown formatting' 
           
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        
       
       - name: Check for changes
         id: git_status
