@@ -61,49 +61,14 @@ jobs:
           EOF
           
           # Use Claude to generate documentation updates
-          cat issue_context.txt | claude -p 'Based on this GitHub issue requesting documentation updates, analyze the codebase and existing documentation in the /docs folder, then output a JSON object with documentation updates needed. The JSON should have this structure:
-          {
-            "files_to_update": [
-              {
-                "filename": "docs/filename.md",
-                "action": "create" or "update",
-                "content": "full markdown content of the file"
-              }
-            ],
-            "summary": "brief summary of changes made"
-          }
-          
+          claude -p 'Based on this GitHub issue requesting documentation updates, analyze the codebase and existing documentation in the /docs folder and create new documentation
           Important:
           - Analyze the existing codebase to understand what needs to be documented
           - Check existing files in /docs to avoid duplication
           - Include code examples from the actual codebase when relevant
           - Add "References issue #${{ env.ISSUE_NUMBER }}" at the bottom of each file
-          - Use proper markdown formatting
-          - Output valid JSON only' --output-format text > updates.json
+          - Use proper markdown formatting' 
           
-          # Process the updates using jq
-          if [ -s updates.json ] && jq -e . updates.json >/dev/null 2>&1; then
-            # Extract and apply each file update
-            jq -r '.files_to_update[] | @base64' updates.json | while read -r file_data; do
-              FILENAME=$(echo "$file_data" | base64 -d | jq -r '.filename')
-              ACTION=$(echo "$file_data" | base64 -d | jq -r '.action')
-              CONTENT=$(echo "$file_data" | base64 -d | jq -r '.content')
-              
-              # Create directory if needed
-              mkdir -p "$(dirname "$FILENAME")"
-              
-              # Write the content to the file
-              echo "$CONTENT" > "$FILENAME"
-              echo "Processed: $FILENAME ($ACTION)"
-            done
-            
-            # Save summary for later use
-            jq -r '.summary' updates.json > summary.txt
-          else
-            echo "No valid JSON response from Claude or error in parsing"
-            echo "Response content:"
-            cat updates.json
-          fi
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       
