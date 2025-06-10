@@ -500,4 +500,8 @@ function cleanupNotifications(taskManager, maxNotifications = 50) {
 }
 ```
 
-References issue #19
+## Credits
+
+Special thanks to **Jayesh Kitukale** for contributing valuable tips and tricks that make this documentation more comprehensive and useful for the developer community.
+
+References issue #20

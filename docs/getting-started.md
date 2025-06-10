@@ -116,7 +116,7 @@ const workTasks = taskManager.getTasksByCategory('work');
 console.log('Work tasks:', workTasks);
 
 // Check overdue tasks
-const overdueeTasks = taskManager.getOverdueTasks();
+const overdueTasks = taskManager.getOverdueTasks();
 if (overdueTasks.length > 0) {
   console.log('You have overdue tasks:', overdueTasks);
 }
@@ -214,4 +214,4 @@ const backup = taskManager.exportTasks('json');
 // Save to file or external storage
 ```
 
-References issue #17
+References issue #20
