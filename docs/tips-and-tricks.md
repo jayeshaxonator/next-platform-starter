@@ -441,7 +441,69 @@ function createConfiguredTaskManager() {
 
 ## 🎖️ Best Practices Summary
 
-1. **Consistent Naming**: Use clear, action-oriented task titles
+### Consistent Naming: Vision-Oriented Task Titles
+
+Use clear, action-oriented task titles that show your vision rather than just tactics. Focus on the outcome and impact, not just the implementation details.
+
+**✅ Vision-Oriented Examples:**
+```javascript
+// Shows the business impact and outcome
+taskManager.addTask('Launch user authentication system', 'Enable secure user access to platform features', 'work');
+
+// Describes the end goal for stakeholders  
+taskManager.addTask('Implement customer feedback dashboard', 'Provide real-time insights for customer success team', 'work');
+
+// Focuses on user value proposition
+taskManager.addTask('Optimize application performance', 'Deliver faster page loads for improved user experience', 'work');
+```
+
+**❌ Tactical Examples to Avoid:**
+```javascript
+// Too implementation-focused
+taskManager.addTask('Write SQL queries', 'Database stuff', 'work');
+
+// Vague and non-actionable
+taskManager.addTask('Fix things', 'Various updates', 'work');
+
+// Lacks context and vision
+taskManager.addTask('Update code', 'Changes needed', 'work');
+```
+
+**Naming Convention Guidelines:**
+
+1. **Start with Action Verbs**: Use verbs that describe the desired outcome
+   - "Launch", "Implement", "Optimize", "Deliver", "Enable", "Establish"
+   - Avoid: "Work on", "Handle", "Deal with", "Fix stuff"
+
+2. **Include Business Context**: Connect technical work to business value
+   ```javascript
+   // Good: Shows business impact
+   taskManager.addTask('Establish automated testing pipeline', 'Ensure reliable software releases and reduce deployment risks', 'work');
+   
+   // Bad: Pure technical focus
+   taskManager.addTask('Set up CI/CD', 'Jenkins configuration', 'work');
+   ```
+
+3. **Specify the Audience/Beneficiary**: Who benefits from this task completion?
+   ```javascript
+   // Customer-focused
+   taskManager.addTask('Streamline checkout process', 'Reduce cart abandonment for online customers', 'work');
+   
+   // Team-focused  
+   taskManager.addTask('Create development guidelines', 'Establish coding standards for engineering team', 'work');
+   ```
+
+4. **Use Outcome Language**: Describe what success looks like
+   ```javascript
+   // Outcome-oriented
+   taskManager.addTask('Achieve 99.9% uptime', 'Implement monitoring and failover systems', 'urgent');
+   
+   // Process-oriented (less preferred)
+   taskManager.addTask('Monitor servers', 'Set up alerting', 'work');
+   ```
+
+### Additional Best Practices
+
 2. **Smart Categories**: Leverage the priority system with 'urgent' and 'work' categories
 3. **Regular Reviews**: Check overdue and upcoming tasks daily
 4. **Tag Strategy**: Develop a consistent tagging system for easy filtering
@@ -505,3 +567,4 @@ function cleanupNotifications(taskManager, maxNotifications = 50) {
 Special thanks to **Jayesh Kitukale** for contributing valuable tips and tricks that make this documentation more comprehensive and useful for the developer community.
 
 References issue #20
+References issue #22
