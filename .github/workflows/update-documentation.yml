@@ -1,0 +1,170 @@
+name: Update Documentation with Claude Code
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  
+  update-documentation:
+    environment: Main
+    # Only run if the issue has the 'documentation' label
+    if: contains(github.event.issue.labels.*.name, 'documentation')
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install Claude Code
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          # Verify installation
+          claude --version
+      
+      - name: Create docs directory if it doesn't exist
+        run: |
+          mkdir -p docs
+      
+      - name: Extract issue information
+        id: issue_info
+        run: |
+          # Extract issue details
+          echo "ISSUE_TITLE=${{ github.event.issue.title }}" >> $GITHUB_ENV
+          echo "ISSUE_BODY<<EOF" >> $GITHUB_ENV
+          echo "${{ github.event.issue.body }}" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          echo "ISSUE_NUMBER=${{ github.event.issue.number }}" >> $GITHUB_ENV
+          echo "ISSUE_URL=${{ github.event.issue.html_url }}" >> $GITHUB_ENV
+      
+      - name: Generate documentation with Claude Code
+        
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # Create issue context to pipe to Claude
+          cat > issue_context.txt << 'EOF'
+          Documentation Request from Issue #${{ env.ISSUE_NUMBER }}
+          
+          Title: ${{ env.ISSUE_TITLE }}
+          
+          Description:
+          ${{ env.ISSUE_BODY }}
+          EOF
+          
+          # Use Claude to generate documentation updates
+          claude --dangerously-skip-permissions -p 'Based on this GitHub issue: ${{ env.ISSUE_TITLE }} requesting documentation updates, 
+          - analyze the codebase and existing documentation in the /docs folder
+          - Analyze the existing codebase to understand what needs to be documented
+          - dont ask any permissions or questions, just make it happen
+          - Check existing files in /docs to avoid duplication
+          - Include code examples from the actual codebase when relevant
+          - Add "References issue #${{ env.ISSUE_NUMBER }}" at the bottom of each file
+          - Use proper markdown formatting' 
+          
+        
+      
+      - name: Check for changes
+        id: git_status
+        run: |
+          git add docs/
+          if git diff --staged --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No documentation changes detected"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Documentation changes detected"
+            git status --porcelain docs/
+          fi
+      
+      - name: Commit and push changes
+        if: steps.git_status.outputs.has_changes == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # Get list of changed files for commit message
+          CHANGED_FILES=$(git diff --staged --name-only docs/ | tr '\n' ' ')
+          
+          # Get summary if available
+          SUMMARY=""
+          if [ -f summary.txt ]; then
+            SUMMARY=$(cat summary.txt)
+          fi
+          
+          git commit -m "docs: Update documentation for issue #${{ env.ISSUE_NUMBER }}
+
+          $SUMMARY
+          
+          - Updated/created documentation files: $CHANGED_FILES
+          - Addresses issue: ${{ env.ISSUE_TITLE }}
+          - Issue URL: ${{ env.ISSUE_URL }}
+          
+          Co-authored-by: Claude <claude@anthropic.com>"
+          
+          git push
+      
+      - name: Comment on issue
+        if: steps.git_status.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get summary if available
+          SUMMARY_TEXT=""
+          if [ -f summary.txt ]; then
+            SUMMARY_TEXT="**Summary of changes:**
+          $(cat summary.txt)
+          
+          "
+          fi
+          
+          gh issue comment ${{ env.ISSUE_NUMBER }} --body "✅ Documentation has been updated automatically!
+
+          The documentation in the \`/docs\` folder has been updated based on your request. 
+
+          $SUMMARY_TEXT**Files changed:**
+          $(git log -1 --name-only --pretty=format:"" docs/ | grep -E '\.md' | sed 's/^/- /')
+
+          You can view the changes in the latest commit: ${{ github.sha }}
+
+          If you need any adjustments to the documentation, please let us know by commenting on this issue."
+      
+      - name: Handle no changes
+        if: steps.git_status.outputs.has_changes == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment ${{ env.ISSUE_NUMBER }} --body "ℹ️ No documentation changes were generated.
+
+          Claude analyzed your request but determined that no changes to the existing documentation were needed, or the request may need clarification.
+
+          Please review your request and ensure it contains:
+          - Clear description of what documentation is needed
+          - Specific topics or features to document
+          - Any examples or details that should be included
+
+          You can add more details to this issue or create a new one with more specific requirements."
+      
+      - name: Add documentation label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Add a label to track processed documentation issues
+          gh issue edit ${{ env.ISSUE_NUMBER }} --add-label "documentation-processed"
+      
+      - name: Install jq
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
