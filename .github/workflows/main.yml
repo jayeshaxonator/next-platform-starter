@@ -66,8 +66,8 @@ jobs:
           EOF
           
           # Use Claude to generate documentation updates
-          printf "2\n" | claude --dangerously-skip-permissions -p 'Based on this GitHub issue: ${{ env.ISSUE_TITLE }} requesting documentation updates, analyze the codebase and existing documentation in the /docs folder and create new documentation
-          Important:
+          printf "2\n" | claude --dangerously-skip-permissions -p 'Based on this GitHub issue: ${{ env.ISSUE_TITLE }} requesting documentation updates, 
+          - analyze the codebase and existing documentation in the /docs folder
           - Analyze the existing codebase to understand what needs to be documented
           - dont ask any permissions or questions, just make it happen
           - Check existing files in /docs to avoid duplication
