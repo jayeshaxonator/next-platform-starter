@@ -164,7 +164,3 @@ jobs:
         run: |
           # Add a label to track processed documentation issues
           gh issue edit ${{ env.ISSUE_NUMBER }} --add-label "documentation-processed"
-      
-      - name: Install jq
-        run: |
-          sudo apt-get update && sudo apt-get install -y jq
