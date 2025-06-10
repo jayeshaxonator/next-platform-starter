@@ -2,7 +2,7 @@ name: Update Documentation with Claude Code
 
 on:
   issues:
-    types: [opened, labeled]
+    types: [labeled]
 
 jobs:
   update-documentation:
